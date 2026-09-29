@@ -69,7 +69,6 @@ const App = (() => {
       pendingMode = 'mp'; showScreen('class');
     });
     $('btn-how').addEventListener('click', () => $('howto').classList.toggle('hidden'));
-    $('btn-back-home').addEventListener('click', () => showScreen('home'));
   }
 
   /* ---------------------------------------------------------- class select */
