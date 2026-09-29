@@ -18,13 +18,13 @@ const Net = (() => {
   /* ------------------------------------------------------------------ */
   /* HOST                                                               */
   /* ------------------------------------------------------------------ */
-  function hostGame(code, hostName, hostCls, events) {
+  function hostGame(code, hostName, events) {
     const peer = new Peer(PREFIX + code);
-    const guests = new Map();   // peerId -> { conn, pid, name, cls }
+    const guests = new Map();   // peerId -> { conn, pid, name }
     let pidSeq = 1;
-    const lobby = [];           // {pid, name, cls, isHost}
+    const lobby = [];           // {pid, name, isHost}
 
-    lobby.push({ pid: 'p0', name: hostName, cls: hostCls, isHost: true });
+    lobby.push({ pid: 'p0', name: hostName, isHost: true });
 
     peer.on('open', () => events.onReady && events.onReady(code));
 
@@ -36,13 +36,16 @@ const Net = (() => {
         if (!msg || typeof msg !== 'object') return;
         if (msg.t === 'hello') {
           const pid = 'p' + (pidSeq++);
-          guests.set(conn.peer, { conn, pid, name: String(msg.name || 'Guest').slice(0, 14), cls: msg.cls || 'brawler' });
-          lobby.push({ pid, name: guests.get(conn.peer).name, cls: guests.get(conn.peer).cls, isHost: false });
+          guests.set(conn.peer, { conn, pid, name: String(msg.name || 'Guest').slice(0, 14) });
+          lobby.push({ pid, name: guests.get(conn.peer).name, isHost: false });
           broadcastLobby();
           events.onLobby && events.onLobby(lobby.slice());
         } else if (msg.t === 'in') {
           const g = guests.get(conn.peer);
           if (g) events.onInput && events.onInput(g.pid, msg.keys);
+        } else if (msg.t === 'act') {
+          const g = guests.get(conn.peer);
+          if (g) events.onAct && events.onAct(g.pid, msg);
         } else if (msg.t === 'chat') {
           const g = guests.get(conn.peer);
           if (g) events.onChat && events.onChat(g.pid, String(msg.text || '').slice(0, 120));
@@ -107,7 +110,7 @@ const Net = (() => {
   /* ------------------------------------------------------------------ */
   /* GUEST                                                              */
   /* ------------------------------------------------------------------ */
-  function joinGame(code, name, cls, events) {
+  function joinGame(code, name, events) {
     code = String(code || '').trim().toUpperCase();
     const peer = new Peer();
     let conn = null;
@@ -116,7 +119,7 @@ const Net = (() => {
     peer.on('open', () => {
       conn = peer.connect(PREFIX + code, { reliable: true });
       conn.on('open', () => {
-        conn.send({ t: 'hello', name, cls });
+        conn.send({ t: 'hello', name });
         helloSent = true;
       });
       conn.on('data', (msg) => {
