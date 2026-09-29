@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1026">
+<title>Stickhaven — stick-figure arena RPG</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+<!-- ======================= HOME ======================= -->
+<section id="screen-home" class="screen">
+  <div class="menu-wrap">
+    <div class="logo-stick" aria-hidden="true">
+      <svg viewBox="0 0 120 120" width="96" height="96">
+        <circle cx="60" cy="26" r="13" fill="none" stroke="#eef1f6" stroke-width="5"/>
+        <line x1="60" y1="42" x2="60" y2="76" stroke="#eef1f6" stroke-width="6" stroke-linecap="round"/>
+        <line x1="60" y1="52" x2="34" y2="64" stroke="#eef1f6" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="52" x2="88" y2="40" stroke="#ff5a5a" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="76" x2="40" y2="104" stroke="#eef1f6" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="76" x2="82" y2="102" stroke="#eef1f6" stroke-width="5" stroke-linecap="round"/>
+        <path d="M44 22 A16 16 0 0 1 76 22" fill="none" stroke="#ff5a5a" stroke-width="5"/>
+      </svg>
+    </div>
+    <h1 class="title">STICKHAVEN</h1>
+    <p class="subtitle">a stick-figure arena RPG · inspired by Stick Online</p>
+    <div class="menu-buttons">
+      <button id="btn-survival" class="big-btn">SURVIVAL<span class="btn-sub">single player · test the fighters</span></button>
+      <button id="btn-multiplayer" class="big-btn alt">MULTIPLAYER<span class="btn-sub">player-hosted · fight together online</span></button>
+    </div>
+    <button id="btn-how" class="link-btn">how to play</button>
+    <div id="howto" class="howto hidden">
+      <p><b>Move:</b> A/D or ←/→ · <b>Jump:</b> W / ↑ / Space · <b>Attack:</b> J or Z · <b>Special:</b> K or X · <b>Chat:</b> T (multiplayer)</p>
+      <p>Defeat waves of monsters, grab XP gems, level up. In multiplayer one player hosts a room and friends join with a code — the host's device runs the world.</p>
+      <p>On phones: turn sideways for fullscreen landscape play.</p>
+    </div>
+    <p class="foot">v1 · works offline for survival · multiplayer needs internet</p>
+  </div>
+</section>
+
+<!-- ======================= CLASS SELECT ======================= -->
+<section id="screen-class" class="screen hidden">
+  <div class="menu-wrap">
+    <h2 class="h2">CHOOSE YOUR FIGHTER</h2>
+    <div id="class-cards" class="class-cards"></div>
+    <div class="row">
+      <button id="btn-class-back" class="ghost-btn">back</button>
+      <button id="btn-class-go" class="big-btn small">CONTINUE</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MULTIPLAYER ======================= -->
+<section id="screen-mp" class="screen hidden">
+  <div class="menu-wrap narrow">
+    <h2 class="h2">MULTIPLAYER</h2>
+    <div id="mp-setup">
+      <div class="tabs">
+        <button id="tab-host" class="tab sel">HOST</button>
+        <button id="tab-join" class="tab">JOIN</button>
+      </div>
+      <div id="mp-host-panel">
+        <label class="lbl">Your name</label>
+        <input id="host-name" class="txt" maxlength="14" placeholder="Host" autocomplete="off">
+        <button id="btn-host" class="big-btn small">CREATE ROOM</button>
+        <p class="hint">You'll get a 6-letter room code to share. Keep this tab open while hosting.</p>
+      </div>
+      <div id="mp-join-panel" class="hidden">
+        <label class="lbl">Room code</label>
+        <input id="join-code" class="txt code" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters">
+        <label class="lbl">Your name</label>
+        <input id="join-name" class="txt" maxlength="14" placeholder="Guest" autocomplete="off">
+        <button id="btn-join" class="big-btn small alt">JOIN ROOM</button>
+      </div>
+      <p id="mp-error" class="err"></p>
+    </div>
+    <div id="lobby" class="hidden">
+      <div id="lobby-code-row" class="hidden">
+        <div class="lbl">ROOM CODE</div>
+        <div id="lobby-code" class="code-big">------</div>
+      </div>
+      <ul id="lobby-players" class="lobby-list"></ul>
+      <p id="lobby-status" class="hint"></p>
+      <div class="row">
+        <button id="btn-leave" class="ghost-btn">leave</button>
+        <button id="btn-start" class="big-btn small hidden">START</button>
+      </div>
+    </div>
+    <button id="btn-mp-back" class="link-btn">back</button>
+  </div>
+</section>
+
+<!-- ======================= GAME ======================= -->
+<section id="screen-game" class="screen hidden">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="hud-left">
+      <div class="bar hp"><div id="hud-hp-fill"></div><span id="hud-hp-text"></span></div>
+      <div class="bar xp"><div id="hud-xp-fill"></div></div>
+      <div class="hud-row">
+        <span id="hud-level" class="pill">LV 1</span>
+        <span id="hud-spc" class="pill">special</span>
+      </div>
+    </div>
+    <div class="hud-center">
+      <div id="hud-wave" class="hud-wave">WAVE 1</div>
+      <div id="hud-foes" class="hud-foes"></div>
+    </div>
+    <div class="hud-right">
+      <div id="hud-score" class="hud-score">0 pts</div>
+      <div id="mp-hud" class="hidden"><span id="hud-players" class="pill"></span></div>
+      <div class="hud-row">
+        <button id="btn-chat" class="icon-btn" title="chat">💬</button>
+        <button id="btn-menu" class="icon-btn" title="menu">☰</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="chatbar" class="hidden">
+    <div id="chatlog"></div>
+    <input id="chatinput" class="txt chat" maxlength="120" placeholder="chat… (Enter to send)" autocomplete="off">
+  </div>
+
+  <div id="touch" class="hidden">
+    <div class="tc-left">
+      <button id="tc-left" class="tc-btn">◀</button>
+      <button id="tc-right" class="tc-btn">▶</button>
+    </div>
+    <div class="tc-right">
+      <button id="tc-spc" class="tc-btn sm">SPC</button>
+      <button id="tc-jump" class="tc-btn sm">JMP</button>
+      <button id="tc-atk" class="tc-btn">ATK</button>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay hidden">
+    <div class="panel">
+      <h2 class="h2">GAME OVER</h2>
+      <p id="go-stats"></p>
+      <div class="row">
+        <button id="btn-go-menu" class="ghost-btn">menu</button>
+        <button id="btn-retry" class="big-btn small">RETRY</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- orientation gate -->
+<div id="orientgate" class="hidden">
+  <div class="gate-inner">
+    <div id="gatetitle" class="gate-title"></div>
+    <div id="gatebody" class="gate-body"></div>
+    <div id="gatehelp" class="gate-help"></div>
+    <div class="gate-phone">📱 ↻</div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/net.js"></script>
+<script src="js/lifecycle.js"></script>
+<script src="js/app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
