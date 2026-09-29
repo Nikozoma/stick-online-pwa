@@ -166,3 +166,38 @@ html, body {
   .title { font-size: 38px; letter-spacing: 5px; }
   .class-card { width: 44vw; max-width: 200px; }
 }
+
+/* ---- v2: stamina, gold, stat panel, shop ---- */
+.bar.st { height: 10px; }
+.bar.st > div { background: #ffd75e; }
+.pill.gold { color: #ffe27d; border-color: #6b5a2a; }
+.pill.pts { color: #7dff9a; border-color: #2a6b3f; cursor: pointer; }
+.panel.wide { width: min(520px, 94vw); max-height: 86vh; overflow-y: auto; text-align: left; }
+.panel.wide .h2 { text-align: center; }
+.chk { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 14px; cursor: pointer; }
+.chk input { width: 18px; height: 18px; }
+.stat-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 15px; }
+.stat-row .sname { width: 44px; font-weight: 800; }
+.stat-row .sdesc { flex: 1; color: #9aa4b2; font-size: 12px; text-align: left; }
+.stat-row .sval { width: 30px; text-align: right; font-weight: 700; }
+.stat-plus {
+  width: 34px; height: 34px; border-radius: 50%; border: 2px solid #3ddc84;
+  background: rgba(61,220,132,.15); color: #3ddc84; font-size: 20px; font-weight: 800; cursor: pointer;
+}
+.stat-plus:active { background: rgba(61,220,132,.4); }
+.shop-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.shop-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(11,16,38,.6); border: 1px solid #2a3560; border-radius: 10px; padding: 8px 10px;
+}
+.shop-row .iname { flex: 1; text-align: left; }
+.shop-row .iname b { display: block; font-size: 14px; }
+.shop-row .iname span { font-size: 11px; color: #9aa4b2; }
+.shop-row.equipped { border-color: #3ddc84; }
+.shop-row .tag { font-size: 10px; color: #3ddc84; font-weight: 800; }
+.mini-btn {
+  background: #2b5cb0; border: none; color: #fff; border-radius: 8px;
+  padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.mini-btn.sell { background: #5a4a2b; }
+.mini-btn:disabled { opacity: .4; cursor: default; }
