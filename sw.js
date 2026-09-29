@@ -1,5 +1,5 @@
 /* Stickhaven service worker — offline-first for survival mode. */
-const CACHE = 'stickhaven-v2';
+const CACHE = 'stickhaven-v3';
 const ASSETS = [
   './',
   './index.html',
