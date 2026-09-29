@@ -30,28 +30,16 @@
     <h1 class="title">STICKHAVEN</h1>
     <p class="subtitle">a stick-figure arena RPG · inspired by Stick Online</p>
     <div class="menu-buttons">
-      <button id="btn-survival" class="big-btn">SURVIVAL<span class="btn-sub">single player · test the fighters</span></button>
+      <button id="btn-survival" class="big-btn">SURVIVAL<span class="btn-sub">single player · waves of monsters</span></button>
       <button id="btn-multiplayer" class="big-btn alt">MULTIPLAYER<span class="btn-sub">player-hosted · fight together online</span></button>
     </div>
     <button id="btn-how" class="link-btn">how to play</button>
     <div id="howto" class="howto hidden">
-      <p><b>Move:</b> A/D or ←/→ · <b>Jump:</b> W / ↑ / Space · <b>Attack:</b> J or Z · <b>Special:</b> K or X · <b>Chat:</b> T (multiplayer)</p>
-      <p>Defeat waves of monsters, grab XP gems, level up. In multiplayer one player hosts a room and friends join with a code — the host's device runs the world.</p>
-      <p>On phones: turn sideways for fullscreen landscape play.</p>
+      <p><b>Move:</b> A/D or ←/→ · <b>Jump:</b> W / ↑ / Space · <b>Attack:</b> J or <b>left-click</b> (aim with the mouse) · <b>Special:</b> K or <b>right-click</b> · <b>Shop:</b> B · <b>Chat:</b> T (multiplayer)</p>
+      <p>Every swing costs stamina — INT raises your pool. Defeat monsters, grab gold and XP gems, level up and spend stat points (STR = damage, VIT = HP, AGI = speed, INT = stamina). Buy better weapons and hats at the shop. Deal at least 15% of a monster's HP to qualify for its drops.</p>
+      <p>In multiplayer one player hosts a room and friends join with a code — the host's device runs the world. On phones: turn sideways for fullscreen landscape play.</p>
     </div>
-    <p class="foot">v1 · works offline for survival · multiplayer needs internet</p>
-  </div>
-</section>
-
-<!-- ======================= CLASS SELECT ======================= -->
-<section id="screen-class" class="screen hidden">
-  <div class="menu-wrap">
-    <h2 class="h2">CHOOSE YOUR FIGHTER</h2>
-    <div id="class-cards" class="class-cards"></div>
-    <div class="row">
-      <button id="btn-class-back" class="ghost-btn">back</button>
-      <button id="btn-class-go" class="big-btn small">CONTINUE</button>
-    </div>
+    <p class="foot">v2 · works offline for survival · multiplayer needs internet</p>
   </div>
 </section>
 
@@ -67,6 +55,7 @@
       <div id="mp-host-panel">
         <label class="lbl">Your name</label>
         <input id="host-name" class="txt" maxlength="14" placeholder="Host" autocomplete="off">
+        <label class="chk"><input type="checkbox" id="host-pvp"> PvP — players can hurt each other</label>
         <button id="btn-host" class="big-btn small">CREATE ROOM</button>
         <p class="hint">You'll get a 6-letter room code to share. Keep this tab open while hosting.</p>
       </div>
@@ -102,10 +91,12 @@
   <div id="hud">
     <div class="hud-left">
       <div class="bar hp"><div id="hud-hp-fill"></div><span id="hud-hp-text"></span></div>
+      <div class="bar st"><div id="hud-st-fill"></div></div>
       <div class="bar xp"><div id="hud-xp-fill"></div></div>
       <div class="hud-row">
         <span id="hud-level" class="pill">LV 1</span>
-        <span id="hud-spc" class="pill">special</span>
+        <span id="hud-gold" class="pill gold">0g</span>
+        <span id="hud-points" class="pill pts hidden">+0</span>
       </div>
     </div>
     <div class="hud-center">
@@ -113,11 +104,34 @@
       <div id="hud-foes" class="hud-foes"></div>
     </div>
     <div class="hud-right">
-      <div id="hud-score" class="hud-score">0 pts</div>
-      <div id="mp-hud" class="hidden"><span id="hud-players" class="pill"></span></div>
       <div class="hud-row">
+        <button id="btn-shop" class="icon-btn" title="shop (B)">🛒</button>
         <button id="btn-chat" class="icon-btn" title="chat">💬</button>
         <button id="btn-menu" class="icon-btn" title="menu">☰</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="statpanel" class="overlay hidden">
+    <div class="panel">
+      <h2 class="h2">LEVEL UP! <span id="stat-points" class="pill pts">+5</span></h2>
+      <p class="hint">Spend your stat points</p>
+      <div id="stat-rows"></div>
+      <button id="btn-stat-close" class="ghost-btn">close</button>
+    </div>
+  </div>
+
+  <div id="shoppanel" class="overlay hidden">
+    <div class="panel wide">
+      <h2 class="h2">SHOP <span id="shop-gold" class="pill gold">0g</span></h2>
+      <div class="tabs">
+        <button id="shop-tab-w" class="tab sel">WEAPONS</button>
+        <button id="shop-tab-h" class="tab">HATS</button>
+      </div>
+      <div id="shop-list" class="shop-list"></div>
+      <div class="row">
+        <button id="btn-arrows" class="ghost-btn">buy 10 arrows · 100g</button>
+        <button id="btn-shop-close" class="ghost-btn">close</button>
       </div>
     </div>
   </div>
