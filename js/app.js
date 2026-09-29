@@ -352,7 +352,10 @@ const App = (() => {
     if (!me) return;
     const tx = Math.max(0, Math.min(Sim.WORLD_W - W, me.x - W / 2));
     camX += (tx - camX) * Math.min(1, dt * 6);
-    const ty = Math.max(-220, Math.min(120, Sim.GROUND_Y + 90 - H));
+    // Y follows the player (not the ground) so short landscape viewports on
+    // phones can't push the player below the visible area. Clamped to keep
+    // some sky above and the ground near the bottom when standing on it.
+    const ty = Math.max(-220, Math.min(Sim.GROUND_Y + 90 - H, me.y - H * 0.55));
     camY += (ty - camY) * Math.min(1, dt * 6);
   }
 
