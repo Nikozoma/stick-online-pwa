@@ -1,5 +1,5 @@
-/* Stickhaven service worker — offline-first for survival mode. */
-const CACHE = 'stickhaven-v5';
+/* Stickhaven service worker — caches the client shell; the game itself is online-only. */
+const CACHE = 'stickhaven-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -29,13 +29,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // PeerJS cloud + signaling: always network (multiplayer needs internet anyway)
-  if (url.host.includes('peerjs.com') || url.host.includes('unpkg.com')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match('./index.html')));
-    return;
-  }
   // Navigation / document: network-first so a new deploy shows up on the next
-  // visit while online; cache fallback keeps survival playable offline.
+  // visit while online; cache fallback serves the shell when offline.
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request)
