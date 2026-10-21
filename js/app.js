@@ -1,4 +1,6 @@
-/* Stickhaven — app shell: screens, input, game loops, HUD, shop, stats, chat. */
+/* Stickhaven — app shell: screens, input, HUD, shop, stats, chat.
+   Online-only: one shared world on the dedicated server. The client sends
+   inputs and renders authoritative snapshots; it never runs the sim. */
 'use strict';
 
 const App = (() => {
@@ -8,14 +10,13 @@ const App = (() => {
 
   // session
   let world = null, me = null, myPid = null;
-  let role = null;             // 'solo' | 'host' | 'guest'
-  let net = null;
-  let rafId = 0, lastT = 0, acc = 0, snapT = 0, inputT = 0, hudT = 0;
+  let net = null, welcomed = false, wasDead = false;
+  let rafId = 0, lastT = 0, inputT = 0, hudT = 0;
   let camX = 0, camY = 0;
   let canvas, ctx, W = 0, H = 0, dpr = 1;
-  let chatSeen = 0;
   let shopTab = 'w';
   let lastPoints = 0;
+  const chatKeys = new Set();
 
   // input
   const held = { l: false, r: false };
@@ -24,7 +25,7 @@ const App = (() => {
   const mouseAim = { x: 0, y: 0, aimed: false };
 
   /* ---------------------------------------------------------- screens */
-  const SCREENS = ['home', 'mp', 'game'];
+  const SCREENS = ['home', 'game'];
   function showScreen(name) {
     screen = name;
     for (const s of SCREENS) $('screen-' + s).classList.toggle('hidden', s !== name);
@@ -43,12 +44,14 @@ const App = (() => {
   function boot() {
     canvas = $('game');
     ctx = canvas.getContext('2d');
-    wireHome(); wireMP(); wireGame(); wireInput(); wirePanels();
+    wireHome(); wireGame(); wireInput(); wirePanels();
     Lifecycle.init(
       { gate: $('orientgate'), gateTitle: $('gatetitle'), gateBody: $('gatebody'), gateHelp: $('gatehelp') },
       { onBlockChange: () => { held.l = held.r = false; touch.l = touch.r = false; edgeJump = edgeAtk = edgeSpc = false; } }
     );
     window.addEventListener('resize', resize);
+    const saved = localStorage.getItem('stickhaven-name');
+    if (saved) $('name-input').value = saved;
     showScreen('home');
   }
 
@@ -62,187 +65,67 @@ const App = (() => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  /* ---------------------------------------------------------- home */
+  /* ---------------------------------------------------------- home / join */
   function wireHome() {
-    $('btn-survival').addEventListener('click', startSurvival);
-    $('btn-multiplayer').addEventListener('click', () => {
-      if (!Net.peerJsReady()) { toast('Multiplayer needs an internet connection (PeerJS failed to load).'); return; }
-      resetMP(); showScreen('mp');
+    $('btn-join-world').addEventListener('click', doJoinWorld);
+    $('name-input').addEventListener('keydown', (e) => {
+      if (e.code === 'Enter') doJoinWorld();
+      e.stopPropagation();
     });
     $('btn-how').addEventListener('click', () => $('howto').classList.toggle('hidden'));
   }
 
-  /* ---------------------------------------------------------- multiplayer setup */
-  function resetMP() {
-    destroyNet();
-    $('mp-setup').classList.remove('hidden');
-    $('lobby').classList.add('hidden');
-    $('mp-error').textContent = '';
-    $('btn-start').classList.add('hidden');
-    $('lobby-code-row').classList.add('hidden');
+  function joinError(msg) {
+    $('join-error').textContent = msg;
+    $('btn-join-world').disabled = false;
   }
 
-  function wireMP() {
-    const tabH = $('tab-host'), tabJ = $('tab-join');
-    tabH.addEventListener('click', () => {
-      tabH.classList.add('sel'); tabJ.classList.remove('sel');
-      $('mp-host-panel').classList.remove('hidden');
-      $('mp-join-panel').classList.add('hidden');
-    });
-    tabJ.addEventListener('click', () => {
-      tabJ.classList.add('sel'); tabH.classList.remove('sel');
-      $('mp-join-panel').classList.remove('hidden');
-      $('mp-host-panel').classList.add('hidden');
-    });
-    $('btn-mp-back').addEventListener('click', () => { destroyNet(); showScreen('home'); });
-    $('btn-host').addEventListener('click', doHost);
-    $('btn-join').addEventListener('click', doJoin);
-    $('btn-start').addEventListener('click', hostStart);
-    $('btn-leave').addEventListener('click', () => { destroyNet(); resetMP(); });
-  }
-
-  function mpError(msg) { $('mp-error').textContent = msg; }
-
-  function doHost() {
-    const name = ($('host-name').value || 'Host').trim().slice(0, 14) || 'Host';
-    const code = Net.makeCode();
-    $('btn-host').disabled = true;
-    net = Net.hostGame(code, name, {
-      onReady: (c) => {
-        role = 'host';
-        $('mp-setup').classList.add('hidden');
-        $('lobby').classList.remove('hidden');
-        $('lobby-code-row').classList.remove('hidden');
-        $('lobby-code').textContent = c;
-        $('btn-start').classList.remove('hidden');
-        $('lobby-status').textContent = 'Share this code with your friends. You are the host — keep this tab open.';
-        renderLobby(net.lobby());
-      },
-      onLobby: (players) => renderLobby(players),
-      onInput: (pid, keys) => {
-        const p = world && Sim.byPid(world, pid);
-        if (p) {
-          p.input.left = !!keys.left; p.input.right = !!keys.right;
-          if (keys.jump) p.input.jump = true;
-          if (keys.attack) p.input.attack = true;
-          if (keys.special) p.input.special = true;
-          if (keys.aim) p.input.aim = keys.aim;
-        }
-      },
-      onAct: (pid, msg) => applyAct(pid, msg),
-      onChat: (pid, text) => {
-        const p = world && Sim.byPid(world, pid);
-        if (p) p.chat = { msg: text, until: world.time + 4 };
-        net.broadcast({ t: 'chat', id: pid, text });
-        chatLog((p ? p.name : '?') + ': ' + text);
-      },
-      onPeerLeft: (pid) => {
-        if (world) Sim.removePlayer(world, pid);
-        toast('A player left.');
-      },
-      onError: (msg) => { mpError(msg); $('btn-host').disabled = false; },
-    });
-  }
-
-  function renderLobby(players) {
-    const ul = $('lobby-players');
-    ul.innerHTML = '';
-    for (const p of players) {
-      const li = document.createElement('li');
-      li.innerHTML = '<b>' + escapeHtml(p.name) + '</b>' + (p.isHost ? ' <span class="lp-host">HOST</span>' : '');
-      ul.appendChild(li);
-    }
-    if (role === 'host') {
-      const pvp = $('host-pvp').checked ? ' · PvP ON' : '';
-      $('lobby-status').textContent = (players.length > 1
-        ? players.length + ' players in. Start when ready!'
-        : 'Share the code above. Waiting for players… (you can start solo too)') + pvp;
-    }
-  }
-
-  function hostStart() {
-    if (!net || role !== 'host') return;
-    world = Sim.createWorld('mp');
-    world.pvp = $('host-pvp').checked;
-    myPid = 'p0';
-    for (const lp of net.lobby()) {
-      const p = Sim.addPlayer(world, lp.pid, lp.name);
-      if (lp.isHost) p.isLocal = true;
-    }
-    me = Sim.byPid(world, myPid);
-    me.isLocal = true;
-    net.start();
-    beginGame('host');
-    toast(world.pvp ? 'World is live — PvP enabled!' : 'World is live!');
-  }
-
-  function doJoin() {
-    const code = ($('join-code').value || '').trim().toUpperCase();
-    const name = ($('join-name').value || 'Guest').trim().slice(0, 14) || 'Guest';
-    if (code.length < 4) { mpError('Enter the room code from the host.'); return; }
-    $('btn-join').disabled = true;
-    net = Net.joinGame(code, name, {
-      onLobby: (players) => {
-        role = 'guest';
-        $('mp-setup').classList.add('hidden');
-        $('lobby').classList.remove('hidden');
-        $('lobby-status').textContent = 'Waiting for the host to start…';
-        renderLobby(players);
-      },
-      onStart: (you) => {
+  function doJoinWorld() {
+    const name = ($('name-input').value || 'Player').trim().slice(0, 14) || 'Player';
+    localStorage.setItem('stickhaven-name', name);
+    $('join-error').textContent = '';
+    $('btn-join-world').disabled = true;
+    welcomed = false;
+    net = Net.connect(name, {
+      onWelcome: (pid) => {
+        welcomed = true;
+        myPid = pid;
         world = Sim.createWorld('mp');
-        myPid = you;
-        beginGame('guest');
-        toast('Joined! Follow the host into battle.');
+        wasDead = false;
+        beginGame();
+        toast('Welcome to Stickhaven!');
       },
-      onSnapshot: (snap) => {
-        if (world && role === 'guest') {
-          Sim.applySnapshot(world, snap);
-          me = Sim.byPid(world, myPid) || null;
-          if (me) me.isLocal = true;
-          syncChatLog();
+      onSnap: (snap) => {
+        if (!world) return;
+        Sim.applySnapshot(world, snap);
+        me = Sim.byPid(world, myPid) || null;
+        if (me) {
+          me.isLocal = true;
+          if (me.dead && !wasDead) toast('You were defeated — respawning…');
+          wasDead = me.dead;
+        }
+        syncChatLog();
+      },
+      onClose: () => {
+        if (!welcomed) {
+          joinError('Could not connect to the server. Check your connection and try again.');
+        } else if (screen === 'game') {
+          toast('Disconnected from the server.', 4000);
+          leaveGame();
         }
       },
-      onChat: (id, text) => {
-        const p = world && Sim.byPid(world, id);
-        if (p) p.chat = { msg: text, until: world.time + 4 };
-        chatLog(((p && p.name) || '?') + ': ' + text);
-      },
-      onHostLeft: () => {
-        toast('Host left — session ended.', 3500);
-        leaveGame();
-        resetMP(); showScreen('mp');
-      },
-      onError: (msg) => { mpError(msg); $('btn-join').disabled = false; },
+      onError: (msg) => joinError(msg),
     });
   }
 
-  function destroyNet() {
-    if (net) { try { net.destroy(); } catch (e) {} net = null; }
-    role = null;
-    const b = $('btn-host'); if (b) b.disabled = false;
-    const j = $('btn-join'); if (j) j.disabled = false;
-  }
-
-  /* ---------------------------------------------------------- game start */
-  function startSurvival() {
-    destroyNet();
-    world = Sim.createWorld('survival');
-    myPid = 'me';
-    me = Sim.addPlayer(world, myPid, 'You');
-    me.isLocal = true;
-    beginGame('solo');
-  }
-
-  function beginGame(r) {
-    role = r;
-    acc = 0; snapT = 0; inputT = 0; hudT = 0;
-    camX = 0; camY = 0; chatSeen = 0; lastPoints = 0;
-    $('gameover').classList.add('hidden');
+  /* ---------------------------------------------------------- game start/end */
+  function beginGame() {
+    inputT = 0; hudT = 0;
+    camX = 0; camY = 0; lastPoints = 0;
+    chatKeys.clear();
     $('statpanel').classList.add('hidden');
     $('shoppanel').classList.add('hidden');
     $('chatlog').innerHTML = '';
-    $('chatbar').classList.toggle('hidden', r === 'solo');
     showScreen('game');
     lastT = performance.now();
     cancelAnimationFrame(rafId);
@@ -251,41 +134,21 @@ const App = (() => {
 
   function leaveGame() {
     cancelAnimationFrame(rafId);
-    destroyNet();
-    world = null; me = null;
+    if (net) { net.close(); net = null; }
+    welcomed = false;
+    world = null; me = null; myPid = null;
+    $('btn-join-world').disabled = false;
     showScreen('home');
   }
 
-  /* ---------------------------------------------------------- guest/host actions */
+  /* ---------------------------------------------------------- shop/stat actions */
   // acts: alloc, buyW, buyH, buyArrows, sellW, sellH, equipW, equipH
   function doAct(act, id) {
-    if (!world || !me) return;
-    if (role === 'guest') {
-      net.send({ t: 'act', act, id });
-      return;
-    }
-    applyAct(myPid, { act, id });
-    refreshPanels();
-  }
-
-  function applyAct(pid, msg) {
-    if (!world) return;
-    const { act, id } = msg;
-    switch (act) {
-      case 'alloc': Sim.allocPoint(world, pid, id); break;
-      case 'buyW': Sim.buyWeapon(world, pid, id); break;
-      case 'buyH': Sim.buyHat(world, pid, id); break;
-      case 'buyArrows': Sim.buyArrows(world, pid); break;
-      case 'sellW': Sim.sellItem(world, pid, 'weapon', id); break;
-      case 'sellH': Sim.sellItem(world, pid, 'hat', id); break;
-      case 'equipW': Sim.equipWeapon(world, pid, id); break;
-      case 'equipH': Sim.equipHat(world, pid, id); break;
-      default: break;
-    }
+    if (!world || !me || !net) return;
+    net.send({ t: 'act', act, id });
   }
 
   /* ---------------------------------------------------------- main loop */
-  const STEP = 1 / 60;
   function frame(now) {
     rafId = requestAnimationFrame(frame);
     if (!lastT) lastT = now;
@@ -295,57 +158,30 @@ const App = (() => {
 
     if (Lifecycle.blocked || !world) { draw(); return; }
 
-    sampleLocalInput();
+    Sim.clientTick(world, dt);
 
-    if (role === 'solo' || role === 'host') {
-      acc += dt;
-      let n = 0;
-      while (acc >= STEP && n < 5) { Sim.update(world, STEP, true); acc -= STEP; n++; }
-      if (n === 5) acc = 0;
-      if (role === 'host') {
-        snapT -= dt;
-        if (snapT <= 0) {
-          snapT = 1 / 12;
-          net.broadcast({ t: 'snap', snap: Sim.snapshot(world) });
-        }
-      }
-      me = Sim.byPid(world, myPid);
-      if (me) me.isLocal = true;
-      syncChatLog();
-      if (world.over && role === 'solo') return gameOver();
-    } else if (role === 'guest') {
-      Sim.clientTick(world, dt);
-      inputT -= dt;
-      if (inputT <= 0) {
-        inputT = 1 / 20;
-        const aim = mouseAim.aimed ? { x: mouseAim.x, y: mouseAim.y, aimed: true } : null;
+    // inputs to the server at 20Hz; edges are consumed only when sent,
+    // so a press between sends is never lost
+    inputT -= dt;
+    if (inputT <= 0) {
+      inputT = 1 / 20;
+      const aim = mouseAim.aimed ? { x: mouseAim.x, y: mouseAim.y, aimed: true } : null;
+      if (net) {
         net.send({ t: 'in', keys: {
           left: held.l || touch.l, right: held.r || touch.r,
           jump: edgeJump, attack: edgeAtk, special: edgeSpc, aim,
         } });
-        mouseAim.aimed = false;
-        clearEdges();
       }
+      mouseAim.aimed = false;
+      clearEdges();
     }
 
-    clearEdges();
     updateCamera(dt);
     draw();
     hudT -= dt;
     if (hudT <= 0) { hudT = 0.12; updateHUD(); refreshPanels(); }
   }
 
-  function sampleLocalInput() {
-    if ((role === 'solo' || role === 'host') && me && world) {
-      me.input.left = held.l || touch.l;
-      me.input.right = held.r || touch.r;
-      if (edgeJump) me.input.jump = true;
-      if (edgeAtk) me.input.attack = true;
-      if (edgeSpc) me.input.special = true;
-      if (mouseAim.aimed) me.input.aim = { x: mouseAim.x, y: mouseAim.y, aimed: true };
-      mouseAim.aimed = false;
-    }
-  }
   function clearEdges() { edgeJump = edgeAtk = edgeSpc = false; }
 
   function updateCamera(dt) {
@@ -366,10 +202,14 @@ const App = (() => {
 
   function syncChatLog() {
     if (!world) return;
-    while (chatSeen < world.chatLog.length) {
-      const c = world.chatLog[chatSeen++];
-      chatLog(c.name ? c.name + ': ' + c.text : c.text);
+    for (const c of world.chatLog) {
+      const key = c.t.toFixed(2) + '|' + (c.name || '') + '|' + c.text;
+      if (!chatKeys.has(key)) {
+        chatKeys.add(key);
+        chatLog(c.name ? c.name + ': ' + c.text : c.text);
+      }
     }
+    if (chatKeys.size > 80) chatKeys.clear(); // bounds growth; may reprint a line
   }
 
   /* ---------------------------------------------------------- HUD */
@@ -388,15 +228,7 @@ const App = (() => {
     pts.classList.toggle('hidden', me.points <= 0);
     pts.textContent = '+' + me.points + ' pts';
     $('hud-wave').textContent = 'WAVE ' + Math.max(1, world.wave);
-    $('hud-foes').textContent = (world.mobs.length + world.spawnQueue.length) + ' left';
-  }
-
-  function gameOver() {
-    cancelAnimationFrame(rafId);
-    $('go-stats').innerHTML =
-      'Wave reached: <b>' + world.wave + '</b><br>' +
-      'Level: <b>' + me.level + '</b> · Gold: <b>' + me.gold + 'g</b>';
-    $('gameover').classList.remove('hidden');
+    $('hud-foes').textContent = world.mobs.length + ' left';
   }
 
   /* ---------------------------------------------------------- stat panel */
@@ -549,14 +381,8 @@ const App = (() => {
     const text = inp.value.trim().slice(0, 120);
     inp.value = '';
     inp.blur();
-    if (!text || !world || !me) return;
-    if (role === 'host') {
-      me.chat = { msg: text, until: world.time + 4 };
-      net.broadcast({ t: 'chat', id: myPid, text });
-      chatLog(me.name + ': ' + text);
-    } else if (role === 'guest') {
-      net.chat(text);
-    }
+    if (!text || !net) return;
+    net.send({ t: 'chat', text });
   }
 
   /* ---------------------------------------------------------- input */
@@ -584,7 +410,7 @@ const App = (() => {
         case 'KeyJ': case 'KeyZ': edgeAtk = true; break;
         case 'KeyK': case 'KeyX': edgeSpc = true; break;
         case 'KeyB': $('btn-shop').click(); break;
-        case 'KeyT': if (role !== 'solo') $('chatinput').focus(); break;
+        case 'KeyT': $('chatinput').focus(); break;
         case 'Escape':
           $('statpanel').classList.add('hidden');
           $('shoppanel').classList.add('hidden');
@@ -608,20 +434,14 @@ const App = (() => {
     canvas.addEventListener('mousemove', (e) => { if (screen === 'game') aimAt(e, false); });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // touch controls
-    const bindHold = (id, set) => {
-      const el = $(id);
-      el.addEventListener('pointerdown', (e) => { e.preventDefault(); set(true); });
-      el.addEventListener('pointerup', () => set(false));
-      el.addEventListener('pointercancel', () => set(false));
-      el.addEventListener('pointerleave', () => set(false));
-    };
-    bindHold('tc-left', (v) => touch.l = v);
-    bindHold('tc-right', (v) => touch.r = v);
-    $('tc-jump').addEventListener('pointerdown', (e) => { e.preventDefault(); edgeJump = true; });
+    // touch buttons: attack / special (bottom-right)
     $('tc-atk').addEventListener('pointerdown', (e) => { e.preventDefault(); edgeAtk = true; });
     $('tc-spc').addEventListener('pointerdown', (e) => { e.preventDefault(); edgeSpc = true; });
-    if (matchMedia('(pointer: coarse)').matches) $('touch').classList.remove('hidden');
+    wireJoystick();
+    if (matchMedia('(pointer: coarse)').matches) {
+      $('touch').classList.remove('hidden');
+      $('joyzone').classList.remove('hidden');
+    }
 
     // chat UI
     $('btn-chat').addEventListener('click', () => $('chatinput').focus());
@@ -631,13 +451,51 @@ const App = (() => {
     });
   }
 
+  /* Floating joystick: wherever the finger lands on the left side of the
+     screen becomes the stick. Left/right to move; push UP to jump — push up
+     a second time mid-air for the double jump. */
+  function wireJoystick() {
+    const zone = $('joyzone'), base = $('joy-base'), nub = $('joy-nub');
+    const joy = { id: null, ox: 0, oy: 0, upLatch: false };
+    const R = 46; // max nub travel (px)
+
+    function place(el, x, y) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
+    function end() {
+      joy.id = null; joy.upLatch = false;
+      touch.l = touch.r = false;
+      base.classList.add('hidden');
+      nub.classList.add('hidden');
+    }
+    zone.addEventListener('pointerdown', (e) => {
+      if (screen !== 'game' || joy.id !== null) return;
+      joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.upLatch = false;
+      try { zone.setPointerCapture(e.pointerId); } catch (err) {}
+      place(base, joy.ox, joy.oy);
+      place(nub, joy.ox, joy.oy);
+      base.classList.remove('hidden');
+      nub.classList.remove('hidden');
+      e.preventDefault();
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== joy.id) return;
+      const dx = e.clientX - joy.ox, dy = e.clientY - joy.oy;
+      const d = Math.hypot(dx, dy) || 1;
+      const cl = Math.min(d, R);
+      place(nub, joy.ox + (dx / d) * cl, joy.oy + (dy / d) * cl);
+      touch.l = dx < -16;
+      touch.r = dx > 16;
+      if (dy < -30 && !joy.upLatch) { edgeJump = true; joy.upLatch = true; }
+      if (dy > -12) joy.upLatch = false; // release the latch so a second push double-jumps
+    });
+    zone.addEventListener('pointerup', (e) => { if (e.pointerId === joy.id) end(); });
+    zone.addEventListener('pointercancel', (e) => { if (e.pointerId === joy.id) end(); });
+  }
+
   /* ---------------------------------------------------------- game screen wiring */
   function wireGame() {
     $('btn-menu').addEventListener('click', () => {
-      if (role === 'solo' || confirm('Leave this game?')) leaveGame();
+      if (confirm('Leave the world?')) leaveGame();
     });
-    $('btn-retry').addEventListener('click', () => startSurvival());
-    $('btn-go-menu').addEventListener('click', () => leaveGame());
   }
 
   return { boot };
