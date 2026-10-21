@@ -116,6 +116,7 @@ const Render = (() => {
     ctx.save();
     ctx.translate(p.x, p.y);
     if (p.hurtT > 0 && Math.floor(world.time * 20) % 2 === 0) ctx.globalAlpha = 0.45;
+    else if ((p.invulnT || 0) > 0 && Math.floor(world.time * 10) % 2 === 0) ctx.globalAlpha = 0.55; // spawn protection shimmer
 
     const dead = p.dead;
     const bodyC = dead ? '#6b7280' : '#eef1f6';
