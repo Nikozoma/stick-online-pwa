@@ -114,7 +114,7 @@ const Render = (() => {
     const f = p.dir || 1;
     const w = Sim.weaponById(p.weapon);
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(p.x, p.y + 18); // art feet sit at ~y+2, ground contact is y+20
     if (p.hurtT > 0 && Math.floor(world.time * 20) % 2 === 0) ctx.globalAlpha = 0.45;
     else if ((p.invulnT || 0) > 0 && Math.floor(world.time * 10) % 2 === 0) ctx.globalAlpha = 0.55; // spawn protection shimmer
 
@@ -186,7 +186,7 @@ const Render = (() => {
 
     // nameplate / chat / hp / level
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(p.x, p.y + 18);
     ctx.textAlign = 'center';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = p.isLocal ? '#7dff9a' : '#ffffff';
@@ -214,7 +214,7 @@ const Render = (() => {
 
     if (dead) {
       ctx.save();
-      ctx.translate(p.x, p.y - 100);
+      ctx.translate(p.x, p.y + 18 - 100);
       ctx.fillStyle = '#ff5a5a';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -347,7 +347,9 @@ const Render = (() => {
     const f = e.dir || 1;
     const r = e.r || 16;
     ctx.save();
-    ctx.translate(e.x, e.y);
+    // art bottoms sit at ~y+0 (golem −4, skitter −2); ground contact is y+20
+    const edy = e.type === 'sandgolem' ? 24 : e.type === 'skitter' ? 22 : 20;
+    ctx.translate(e.x, e.y + edy);
 
     if (e.type === 'blob' || e.type === 'gloom' || e.type === 'lurker' || e.type === 'bossblob') {
       const wob = 1 + Math.sin(T * 6 + e.id) * 0.08;
@@ -466,7 +468,7 @@ const Render = (() => {
     const showBar = e.boss || e.hp < e.maxHp;
     if (showBar) {
       const bw = e.boss ? 110 : 56, bh = e.boss ? 8 : 6;
-      const top = e.y - (e.boss === 'sandgolem' ? 132 : e.r * 2 + 14);
+      const top = e.y + 20 - (e.boss === 'sandgolem' ? 132 : e.r * 2 + 14);
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(e.x - bw / 2, top, bw, bh);
       ctx.fillStyle = e.boss ? '#ffb13d' : '#ff5a5a';
