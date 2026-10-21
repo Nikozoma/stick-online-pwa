@@ -1,6 +1,6 @@
 /* Stickhaven networking — WebSocket client for the dedicated server.
-   One shared world: connect, join with a name, send inputs at 20Hz,
-   receive authoritative snapshots at 12Hz. No lobbies, no room codes. */
+   One shared world: connect, join with a name, send inputs at 60Hz,
+   receive authoritative snapshots at 60Hz. No lobbies, no room codes. */
 'use strict';
 
 const Net = (() => {
