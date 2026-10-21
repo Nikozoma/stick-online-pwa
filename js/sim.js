@@ -42,6 +42,7 @@ function hatById(id) { return HATS.find((h) => h.id === id) || HATS[0]; }
 /* ================= world ================= */
 
 const WORLD_W = 2400, WORLD_H = 900, GROUND_Y = 780;
+const JUMP_STAM = 6, DJUMP_STAM = 10; // jumping costs stamina, like swinging
 
 function makePlatforms() {
   return [
@@ -87,7 +88,7 @@ function makePlayer(pid, name) {
     weapon: 'stick', hat: 'none',
     ownedW: ['stick'], ownedH: ['none'], arrows: 10,
     gold: 0, level: 1, xp: 0,
-    hp: 100, st: 40,
+    hp: 100, st: 40, jumpsUsed: 0,
     attackCd: 0, specialCd: 0, swingT: 0, swingHeavy: false,
     hurtT: 0, dead: false, respT: 0,
     input: { left: false, right: false, jump: false, attack: false, special: false, aim: null },
@@ -121,7 +122,7 @@ function spawnPlayer(world, p) {
   p.x = rand(WORLD_W * 0.35, WORLD_W * 0.65);
   p.y = GROUND_Y - 60;
   p.vx = 0; p.vy = 0; p.hp = maxHp(p); p.st = maxSt(p);
-  p.dead = false; p.respT = 0; p.hurtT = 0;
+  p.dead = false; p.respT = 0; p.hurtT = 0; p.jumpsUsed = 0;
   p.tx = p.x; p.ty = p.y;
 }
 
@@ -475,7 +476,17 @@ function updatePlayer(world, p, dt) {
   else p.vx *= Math.pow(0.0001, dt);
 
   p.vy += 1500 * dt;
-  if (inp.jump && p.onGround) { p.vy = -jumpVel(p); p.onGround = false; }
+  if (p.onGround) p.jumpsUsed = 0;
+  if (inp.jump) {
+    if (p.onGround && p.st >= JUMP_STAM) {
+      p.st -= JUMP_STAM;
+      p.vy = -jumpVel(p); p.onGround = false; p.jumpsUsed = 1;
+    } else if (!p.onGround && (p.jumpsUsed || 0) < 2 && p.st >= DJUMP_STAM) {
+      // double jump — everyone has it; costs extra stamina
+      p.st -= DJUMP_STAM;
+      p.vy = -jumpVel(p) * 0.95; p.jumpsUsed = (p.jumpsUsed || 0) + 1;
+    }
+  }
   inp.jump = false; // edge-triggered: consume each tick
 
   p.x += p.vx * dt; p.y += p.vy * dt;
