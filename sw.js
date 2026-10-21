@@ -1,5 +1,5 @@
 /* Stickhaven service worker — caches the client shell; the game itself is online-only. */
-const CACHE = 'stickhaven-v6';
+const CACHE = 'stickhaven-v7';
 const ASSETS = [
   './',
   './index.html',
