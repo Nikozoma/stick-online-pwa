@@ -9,7 +9,6 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
@@ -30,57 +29,18 @@
     <h1 class="title">STICKHAVEN</h1>
     <p class="subtitle">a stick-figure arena RPG · inspired by Stick Online</p>
     <div class="menu-buttons">
-      <button id="btn-survival" class="big-btn">SURVIVAL<span class="btn-sub">single player · waves of monsters</span></button>
-      <button id="btn-multiplayer" class="big-btn alt">MULTIPLAYER<span class="btn-sub">player-hosted · fight together online</span></button>
+      <label class="lbl" for="name-input">Your name</label>
+      <input id="name-input" class="txt" maxlength="14" placeholder="Stick fighter" autocomplete="off">
+      <button id="btn-join-world" class="big-btn">JOIN WORLD<span class="btn-sub">one shared online server · everyone's in the same world</span></button>
+      <p id="join-error" class="err"></p>
     </div>
     <button id="btn-how" class="link-btn">how to play</button>
     <div id="howto" class="howto hidden">
-      <p><b>Move:</b> A/D or ←/→ · <b>Jump:</b> W / ↑ / Space · <b>Attack:</b> J or <b>left-click</b> (aim with the mouse) · <b>Special:</b> K or <b>right-click</b> · <b>Shop:</b> B · <b>Chat:</b> T (multiplayer)</p>
-      <p>Every swing costs stamina — INT raises your pool. Defeat monsters, grab gold and XP gems, level up and spend stat points (STR = damage, VIT = HP, AGI = speed, INT = stamina). Buy better weapons and hats at the shop. Deal at least 15% of a monster's HP to qualify for its drops.</p>
-      <p>In multiplayer one player hosts a room and friends join with a code — the host's device runs the world. On phones: turn sideways for fullscreen landscape play.</p>
+      <p><b>Move:</b> A/D or ←/→ · <b>Jump:</b> W / ↑ / Space — press again mid-air to <b>double jump</b> · <b>Attack:</b> J or <b>left-click</b> (aim with the mouse) · <b>Special:</b> K or <b>right-click</b> · <b>Shop:</b> B · <b>Chat:</b> T</p>
+      <p>Every swing <i>and</i> every jump costs stamina — INT raises your pool. Defeat monsters, grab gold and XP gems, level up and spend stat points (STR = damage, VIT = HP, AGI = speed, INT = stamina). Buy better weapons and hats at the shop. Deal at least 15% of a monster's HP to qualify for its drops.</p>
+      <p>Everyone plays together in one persistent server world — waves keep coming, and if you fall you'll respawn a few seconds later. On phones: a floating joystick appears wherever your thumb lands on the left side (push up to jump), with ATK/SPC buttons at the bottom-right. Turn your phone sideways for fullscreen landscape play.</p>
     </div>
-    <p class="foot">v2 · works offline for survival · multiplayer needs internet</p>
-  </div>
-</section>
-
-<!-- ======================= MULTIPLAYER ======================= -->
-<section id="screen-mp" class="screen hidden">
-  <div class="menu-wrap narrow">
-    <h2 class="h2">MULTIPLAYER</h2>
-    <div id="mp-setup">
-      <div class="tabs">
-        <button id="tab-host" class="tab sel">HOST</button>
-        <button id="tab-join" class="tab">JOIN</button>
-      </div>
-      <div id="mp-host-panel">
-        <label class="lbl">Your name</label>
-        <input id="host-name" class="txt" maxlength="14" placeholder="Host" autocomplete="off">
-        <label class="chk"><input type="checkbox" id="host-pvp"> PvP — players can hurt each other</label>
-        <button id="btn-host" class="big-btn small">CREATE ROOM</button>
-        <p class="hint">You'll get a 6-letter room code to share. Keep this tab open while hosting.</p>
-      </div>
-      <div id="mp-join-panel" class="hidden">
-        <label class="lbl">Room code</label>
-        <input id="join-code" class="txt code" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters">
-        <label class="lbl">Your name</label>
-        <input id="join-name" class="txt" maxlength="14" placeholder="Guest" autocomplete="off">
-        <button id="btn-join" class="big-btn small alt">JOIN ROOM</button>
-      </div>
-      <p id="mp-error" class="err"></p>
-    </div>
-    <div id="lobby" class="hidden">
-      <div id="lobby-code-row" class="hidden">
-        <div class="lbl">ROOM CODE</div>
-        <div id="lobby-code" class="code-big">------</div>
-      </div>
-      <ul id="lobby-players" class="lobby-list"></ul>
-      <p id="lobby-status" class="hint"></p>
-      <div class="row">
-        <button id="btn-leave" class="ghost-btn">leave</button>
-        <button id="btn-start" class="big-btn small hidden">START</button>
-      </div>
-    </div>
-    <button id="btn-mp-back" class="link-btn">back</button>
+    <p class="foot">v3 · online only · one shared world</p>
   </div>
 </section>
 
@@ -136,31 +96,19 @@
     </div>
   </div>
 
-  <div id="chatbar" class="hidden">
+  <div id="chatbar">
     <div id="chatlog"></div>
     <input id="chatinput" class="txt chat" maxlength="120" placeholder="chat… (Enter to send)" autocomplete="off">
   </div>
 
+  <div id="joyzone" class="hidden"></div>
+  <div id="joy-base" class="hidden"></div>
+  <div id="joy-nub" class="hidden"></div>
+
   <div id="touch" class="hidden">
-    <div class="tc-left">
-      <button id="tc-left" class="tc-btn">◀</button>
-      <button id="tc-right" class="tc-btn">▶</button>
-    </div>
     <div class="tc-right">
       <button id="tc-spc" class="tc-btn sm">SPC</button>
-      <button id="tc-jump" class="tc-btn sm">JMP</button>
-      <button id="tc-atk" class="tc-btn">ATK</button>
-    </div>
-  </div>
-
-  <div id="gameover" class="overlay hidden">
-    <div class="panel">
-      <h2 class="h2">GAME OVER</h2>
-      <p id="go-stats"></p>
-      <div class="row">
-        <button id="btn-go-menu" class="ghost-btn">menu</button>
-        <button id="btn-retry" class="big-btn small">RETRY</button>
-      </div>
+      <button id="tc-atk" class="tc-btn big">ATK</button>
     </div>
   </div>
 </section>
