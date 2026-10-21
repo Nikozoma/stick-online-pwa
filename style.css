@@ -123,13 +123,13 @@ html, body {
 }
 
 /* chat */
-#chatbar { position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); width: min(320px, 70vw); }
+#chatbar { position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); width: min(320px, 70vw); z-index: 7; }
 #chatlog { font-size: 13px; margin-bottom: 6px; }
 #chatlog div { background: rgba(11,16,38,.85); border-radius: 8px; padding: 4px 10px; margin: 3px 0; width: fit-content; max-width: 100%; }
 .txt.chat { font-size: 14px; padding: 9px 12px; }
 
 /* touch controls */
-#touch { position: fixed; inset: auto 0 0 0; display: flex; justify-content: space-between; padding: 0 14px calc(16px + env(safe-area-inset-bottom)); pointer-events: none; }
+#touch { position: fixed; inset: auto 0 0 0; display: flex; justify-content: flex-end; padding: 0 6px calc(14px + env(safe-area-inset-bottom)); pointer-events: none; z-index: 6; }
 .tc-left, .tc-right { display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
 .tc-btn {
   width: 68px; height: 68px; border-radius: 50%;
@@ -137,6 +137,7 @@ html, body {
   font-size: 20px; font-weight: 800; touch-action: none;
 }
 .tc-btn.sm { width: 56px; height: 56px; font-size: 13px; }
+.tc-btn.big { width: 94px; height: 94px; font-size: 23px; }
 .tc-btn:active { background: rgba(61,125,214,.6); }
 
 /* overlays */
@@ -201,3 +202,18 @@ html, body {
 }
 .mini-btn.sell { background: #5a4a2b; }
 .mini-btn:disabled { opacity: .4; cursor: default; }
+
+/* ---- v3: dedicated server + floating joystick ---- */
+#hud { z-index: 7; }
+#joyzone { position: fixed; left: 0; top: 15%; width: 55%; height: 85%; z-index: 4; touch-action: none; }
+#joy-base {
+  position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px;
+  border-radius: 50%; background: rgba(20,27,61,.35);
+  border: 2px solid rgba(238,241,246,.35);
+  z-index: 5; pointer-events: none;
+}
+#joy-nub {
+  position: fixed; width: 48px; height: 48px; margin: -24px 0 0 -24px;
+  border-radius: 50%; background: rgba(238,241,246,.45);
+  z-index: 5; pointer-events: none;
+}
