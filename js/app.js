@@ -65,9 +65,80 @@ const App = (() => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  /* ------------------------------------- manual game update (Void Wars pattern)
+     Some phones never offer a cache clear and an installed PWA can sit on an
+     old service worker for days. This button asks the server which build is
+     current, kicks the service-worker update, and — if the new worker doesn't
+     take over quickly — wipes every cache + registration and reloads with a
+     cache-busting URL. localStorage (your name) is never touched. */
+  function buildNumOf(txt) { const m = /stickhaven-v(\d+)/.exec(txt || ''); return m ? +m[1] : 0; }
+  async function activeBuildNum() {
+    try {
+      const keys = await caches.keys();
+      for (const k of keys) { const v = buildNumOf(k); if (v) return v; }
+    } catch (e) {}
+    return 0;
+  }
+  let _updating = false;
+  async function forceGameUpdate() {
+    if (_updating) return;
+    _updating = true;
+    const btn = $('updatebtn');
+    btn.disabled = true;
+    const set = (t) => { btn.textContent = t; };
+    set('CHECKING…');
+    let serverV = 0;
+    try {
+      const r = await fetch('sw.js?check=' + Date.now(), { cache: 'no-store' });
+      if (r && r.ok) serverV = buildNumOf(await r.text());
+    } catch (e) {}
+    const curV = await activeBuildNum();
+    if (serverV && curV && serverV === curV) set('LATEST v' + curV + ' — RELOADING FRESH…');
+    else if (serverV) set('UPDATING v' + (curV || '?') + ' → v' + serverV + '…');
+    else set('UPDATING…');
+    let reloaded = false;
+    const doReload = () => {
+      if (reloaded) return;
+      reloaded = true;
+      try {
+        const u = new URL(location.href);
+        u.searchParams.set('upd', String(Date.now()));
+        location.replace(u.toString());
+      } catch (e) { location.reload(); }
+    };
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => setTimeout(doReload, 150));
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.update().catch(() => {});
+      }
+    } catch (e) {}
+    // nuclear fallback: no new controller within a few seconds -> wipe + reload
+    setTimeout(async () => {
+      if (reloaded) return;
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch (e) {}
+      doReload();
+    }, 3500);
+  }
+  function refreshUpdateLabel(tries) {
+    activeBuildNum().then((v) => {
+      if (v && !_updating) $('updatebtn').textContent = '↻ UPDATE GAME · v' + v;
+      else if (tries > 0) setTimeout(() => refreshUpdateLabel(tries - 1), 1500);
+    });
+  }
+
   /* ---------------------------------------------------------- home / join */
   function wireHome() {
     $('btn-join-world').addEventListener('click', doJoinWorld);
+    $('updatebtn').addEventListener('click', forceGameUpdate);
+    refreshUpdateLabel(4);
     $('name-input').addEventListener('keydown', (e) => {
       if (e.code === 'Enter') doJoinWorld();
       e.stopPropagation();
