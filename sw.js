@@ -1,5 +1,5 @@
 /* Stickhaven service worker — caches the client shell; the game itself is online-only. */
-const CACHE = 'stickhaven-v8';
+const CACHE = 'stickhaven-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -46,8 +46,10 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   // App assets: cache-first for instant loads + offline play.
+  // Exact-URL matching on purpose: the update button fetches sw.js?check=<ts>
+  // and that request must reach the network, never a cached copy.
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then((hit) => {
+    caches.match(e.request).then((hit) => {
       if (hit) return hit;
       return fetch(e.request).then((res) => {
         if (url.origin === self.location.origin && res.ok) {
