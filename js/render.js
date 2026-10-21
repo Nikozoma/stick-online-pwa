@@ -137,16 +137,26 @@ const Render = (() => {
     const hx = 2 * f, hy = -56; // head center (used below too)
     if (swinging) {
       const ext = p.swingHeavy ? 1.25 : 1;
-      limb(ctx, 0, -40, -0.35 * f, 30 * ext, 5, bodyC);
-      drawWeaponInHand(ctx, w, 0, -40, -0.35 * f, 30 * ext, p.swingHeavy);
-      if (p.swingHeavy) {
-        // motion arc
-        ctx.strokeStyle = 'rgba(255,215,94,0.7)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, -40, 44 * ext, f > 0 ? -1.1 : Math.PI - 1.1, f > 0 ? 0.5 : Math.PI + 0.5);
-        ctx.stroke();
+      const dur = p.swingHeavy ? 0.3 : 0.22;
+      const s = Math.min(1, Math.max(0, 1 - p.swingT / dur)); // 0 at swing start → 1 at end
+      const ease = s * s * (3 - 2 * s); // smoothstep — fast through the middle of the cut
+      // wide overhead slash: arm sweeps from up-back (-129°) to down-forward (+43°)
+      const th = -2.25 + ease * 3.0;
+      const ang = f > 0 ? th : Math.PI - th;
+      // swoosh trail along the path the blade has swept so far
+      ctx.strokeStyle = p.swingHeavy ? 'rgba(255,215,94,0.55)' : 'rgba(215,235,255,0.35)';
+      ctx.lineWidth = 15;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i <= 7; i++) {
+        const ti = -2.25 + (th + 2.25) * (i / 7);
+        const a = f > 0 ? ti : Math.PI - ti;
+        const px = Math.cos(a) * 58 * ext, py = -40 + Math.sin(a) * 58 * ext;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
+      ctx.stroke();
+      limb(ctx, 0, -40, ang, 30 * ext, 5, bodyC);
+      drawWeaponInHand(ctx, w, 0, -40, ang, 30 * ext, p.swingHeavy);
     } else if (w.ranged) {
       limb(ctx, 0, -40, 0, 26, 4, bodyC);
       // bow arc in hand
