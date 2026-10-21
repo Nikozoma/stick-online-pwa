@@ -523,23 +523,26 @@ const App = (() => {
   }
 
   /* Floating joystick: wherever the finger lands on the left side of the
-     screen becomes the stick. Left/right to move; push UP to jump — push up
-     a second time mid-air for the double jump. */
+     screen becomes the stick. Left/right own most of the stick — horizontal
+     movement reads straight off dx across a wide range — while JUMP only
+     counts inside a narrow up-sliver (±33° of vertical), so a thumb drifting
+     up while running can't fire an accidental jump. Push up = jump; while
+     still holding, push FURTHER up (or ease off and push again) = double jump. */
   function wireJoystick() {
     const zone = $('joyzone'), base = $('joy-base'), nub = $('joy-nub');
-    const joy = { id: null, ox: 0, oy: 0, upLatch: false };
+    const joy = { id: null, ox: 0, oy: 0, stage: 0, t1: 0, rearm: false };
     const R = 46; // max nub travel (px)
 
     function place(el, x, y) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
     function end() {
-      joy.id = null; joy.upLatch = false;
+      joy.id = null; joy.stage = 0; joy.rearm = false;
       touch.l = touch.r = false;
       base.classList.add('hidden');
       nub.classList.add('hidden');
     }
     zone.addEventListener('pointerdown', (e) => {
       if (screen !== 'game' || joy.id !== null) return;
-      joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.upLatch = false;
+      joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.stage = 0; joy.rearm = false;
       try { zone.setPointerCapture(e.pointerId); } catch (err) {}
       place(base, joy.ox, joy.oy);
       place(nub, joy.ox, joy.oy);
@@ -553,10 +556,23 @@ const App = (() => {
       const d = Math.hypot(dx, dy) || 1;
       const cl = Math.min(d, R);
       place(nub, joy.ox + (dx / d) * cl, joy.oy + (dy / d) * cl);
-      touch.l = dx < -16;
-      touch.r = dx > 16;
-      if (dy < -30 && !joy.upLatch) { edgeJump = true; joy.upLatch = true; }
-      if (dy > -12) joy.upLatch = false; // release the latch so a second push double-jumps
+      touch.l = dx < -14;
+      touch.r = dx > 14;
+      // up-sliver: within ±33° of straight up (tan33 ≈ 0.65) — left/right get
+      // ~114° of stick each, up/down ~66°; jumping has to be deliberate
+      const inUp = dy < -14 && Math.abs(dx) <= -dy * 0.65;
+      const now = performance.now();
+      if (dy > -10 && Math.abs(dx) < 14) { joy.stage = 0; joy.rearm = false; } // back to center re-arms the gesture
+      if (joy.stage === 0) {
+        if (inUp && dy <= -24) { edgeJump = true; joy.stage = 1; joy.t1 = now; joy.rearm = false; }
+      } else if (joy.stage === 1) {
+        if (!inUp || dy > -14) joy.rearm = true; // eased off — a fresh push works too
+        // second push = shove FURTHER up to the deep zone, or a re-push after
+        // easing off; the 130ms gap keeps one hard slam from firing both jumps
+        if (now - joy.t1 >= 130 && inUp && (dy <= -44 || (joy.rearm && dy <= -24))) {
+          edgeJump = true; joy.stage = 2;
+        }
+      }
     });
     zone.addEventListener('pointerup', (e) => { if (e.pointerId === joy.id) end(); });
     zone.addEventListener('pointercancel', (e) => { if (e.pointerId === joy.id) end(); });
