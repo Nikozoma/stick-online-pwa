@@ -160,11 +160,11 @@ const App = (() => {
 
     Sim.clientTick(world, dt);
 
-    // inputs to the server at 20Hz; edges are consumed only when sent,
+    // inputs to the server at 60Hz; edges are consumed only when sent,
     // so a press between sends is never lost
     inputT -= dt;
     if (inputT <= 0) {
-      inputT = 1 / 20;
+      inputT = 1 / 60;
       const aim = mouseAim.aimed ? { x: mouseAim.x, y: mouseAim.y, aimed: true } : null;
       if (net) {
         net.send({ t: 'in', keys: {
