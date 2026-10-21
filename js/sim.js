@@ -90,7 +90,7 @@ function makePlayer(pid, name) {
     gold: 0, level: 1, xp: 0,
     hp: 100, st: 40, jumpsUsed: 0,
     attackCd: 0, specialCd: 0, swingT: 0, swingHeavy: false,
-    hurtT: 0, dead: false, respT: 0,
+    hurtT: 0, dead: false, respT: 0, invulnT: 0,
     input: { left: false, right: false, jump: false, attack: false, special: false, aim: null },
     tx: 0, ty: 0,
     chat: null,
@@ -122,7 +122,7 @@ function spawnPlayer(world, p) {
   p.x = rand(WORLD_W * 0.35, WORLD_W * 0.65);
   p.y = GROUND_Y - 60;
   p.vx = 0; p.vy = 0; p.hp = maxHp(p); p.st = maxSt(p);
-  p.dead = false; p.respT = 0; p.hurtT = 0; p.jumpsUsed = 0;
+  p.dead = false; p.respT = 0; p.hurtT = 0; p.jumpsUsed = 0; p.invulnT = 2.5;
   p.tx = p.x; p.ty = p.y;
 }
 
@@ -285,7 +285,8 @@ function burst(world, x, y, color, n) {
 }
 
 function pushChat(world, name, text) {
-  world.chatLog.push({ name, text: String(text).slice(0, 120), t: world.time });
+  world.chatSeq = (world.chatSeq || 0) + 1;
+  world.chatLog.push({ id: world.chatSeq, name, text: String(text).slice(0, 120), t: world.time });
   if (world.chatLog.length > 40) world.chatLog.shift();
 }
 
@@ -355,7 +356,7 @@ function killMob(world, mob) {
 }
 
 function damagePlayer(world, target, dmg, from) {
-  if (target.dead || target.hp <= 0) return;
+  if (target.dead || target.hp <= 0 || (target.invulnT || 0) > 0) return;
   target.hp -= dmg;
   target.hurtT = 0.2;
   burst(world, target.x, target.y - 40, '#ff6b6b', 6);
@@ -496,6 +497,7 @@ function updatePlayer(world, p, dt) {
 
   p.attackCd = Math.max(0, p.attackCd - dt);
   p.specialCd = Math.max(0, p.specialCd - dt);
+  p.invulnT = Math.max(0, (p.invulnT || 0) - dt);
   p.swingT = Math.max(0, p.swingT - dt);
   p.hurtT = Math.max(0, p.hurtT - dt);
 
@@ -719,6 +721,7 @@ function snapshot(world) {
       lvl: p.level, xp: p.xp, points: p.points, gold: p.gold, arrows: p.arrows,
       stats: { ...p.stats }, ownedW: [...p.ownedW], ownedH: [...p.ownedH],
       swingT: +p.swingT.toFixed(2), swingHeavy: p.swingHeavy,
+      inv: +(p.invulnT || 0).toFixed(2),
       dead: p.dead, chat: p.chat,
     })),
     mobs: world.mobs.map((m) => ({
@@ -753,6 +756,7 @@ function applySnapshot(world, snap) {
     p.gold = s.gold; p.arrows = s.arrows;
     p.stats = { ...s.stats }; p.ownedW = [...s.ownedW]; p.ownedH = [...s.ownedH];
     p.swingT = s.swingT; p.swingHeavy = s.swingHeavy;
+    p.invulnT = s.inv || 0;
     p.dead = s.dead; p.chat = s.chat;
   }
   world.players = world.players.filter((p) => seen.has(p.pid));
@@ -778,7 +782,14 @@ function applySnapshot(world, snap) {
   world.mobs = world.mobs.filter((m) => seenM.has(m.id));
   world.projectiles = snap.projs.map((s) => ({ ...s, id: uid(), life: 1 }));
   world.pickups = snap.pickups.map((s) => ({ ...s, id: uid(), vx: 0, vy: 0, val: 0, t: 0 }));
-  if (snap.chat.length > world.chatLog.length) world.chatLog = snap.chat.map((c) => ({ ...c }));
+  // chat: merge by entry id — a length check breaks once both sides cap at 8
+  {
+    const seen = new Set(world.chatLog.map((c) => c.id));
+    for (const c of snap.chat) {
+      if (!seen.has(c.id)) world.chatLog.push({ ...c });
+    }
+    if (world.chatLog.length > 40) world.chatLog.splice(0, world.chatLog.length - 40);
+  }
 }
 
 /* ================= exports ================= */
